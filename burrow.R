@@ -1,7 +1,7 @@
 
 # ---------------------------------------------
 
-datashape <- function(df, diagnostics = FALSE, verbose = TRUE) {
+dfinfo <- function(df, diagnostics = FALSE, verbose = TRUE) {
 
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   # 1.1 : get variable names
@@ -23,6 +23,9 @@ datashape <- function(df, diagnostics = FALSE, verbose = TRUE) {
     colnames(df) <- names.good
   }
   
+  # 1.3 : get excel column header
+  dfout$Excel <- sapply(1:ncol(df), excelcol) 
+  
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   # 2.1 : get variable class
   # sometime there is more than 1 description, eg. ordered factor
@@ -32,8 +35,9 @@ datashape <- function(df, diagnostics = FALSE, verbose = TRUE) {
   dfout$Type <- df %>% sapply(function(x) paste(typeof(x), collapse = '.')) %>% unlist()
 
   # 2.2.1 : now, convert any factors to character
-  df <- data.frame(lapply(df, as.character), stringsAsFactors=FALSE)
-  
+  factor_columns <- sapply(df, is.factor)   
+  df[factor_columns] <- lapply(df[factor_columns], as.character) 
+
   # 2.3 : get NAs
   dfout$NA_Tot <- df %>% sapply(function(x) as.character(sum(is.na(x))))
   
@@ -51,89 +55,17 @@ datashape <- function(df, diagnostics = FALSE, verbose = TRUE) {
   
   # 2.6 : get max values
   dfout$Max <- df %>% sapply(function(x) as.character(max(x, na.rm = TRUE)))
-
-  # 
-  # # get length of content
-  # temp <- df %>% 
-  #   dplyr::summarise_all(funs(mean(str_length(.)))) %>% 
-  #   melt(id.vars = NULL, variable.name = 'Variables', value.name = 'StrLength') %>%
-  #   mutate_if(is.factor, as.character)
-  # dfout <- dfout %>%
-  #   left_join(temp, by=c('Variables'))
-  # 
-  # # mean of numerics
-  # if (diagnostics==TRUE) print('Means')
-  # temp <- df %>%
-  #   summarise_if(is.numeric, mean, na.rm = TRUE) %>%
-  #   melt(id.vars = NULL, variable.name = 'Variables', value.name = 'Mean') %>%
-  #   mutate_if(is.factor, as.character)
-  # dfout <- dfout %>%
-  #   left_join(temp, by=c('Variables'))
-  # 
-  # # median of numerics
-  # if (diagnostics==TRUE) print('Medians')
-  # temp <- df %>%
-  #   summarise_if(is.numeric, median, na.rm = TRUE) %>%
-  #   melt(id.vars = NULL, variable.name = 'Variables', value.name = 'Median') %>%
-  #   mutate_if(is.factor, as.character)
-  # dfout <- dfout %>%
-  #   left_join(temp, by=c('Variables'))
-  # 
-  # # max of numerics
-  # if (diagnostics==TRUE) print('Max')
-  # temp <- df %>%
-  #   summarise_if(is.numeric, max, na.rm = TRUE) %>%
-  #   melt(id.vars = NULL, variable.name = 'Variables', value.name = 'Max') %>%
-  #   mutate_if(is.factor, as.character)
-  # dfout <- dfout %>%
-  #   left_join(temp, by=c('Variables'))
-  # 
-  # # min of numerics
-  # if (diagnostics==TRUE) print('Min')
-  # temp <- df %>%
-  #   summarise_if(is.numeric, min, na.rm = TRUE) %>%
-  #   melt(id.vars = NULL, variable.name = 'Variables', value.name = 'Min') %>%
-  #   mutate_if(is.factor, as.character)
-  # dfout <- dfout %>%
-  #   left_join(temp, by=c('Variables'))
-  # 
-  # # skewness of numerics
-  # vars.num <- dfout %>%
-  #   filter(Class == 'numeric') %>%
-  #   select(Variables) %>%
-  #   pull()
-  # temp <- df %>%
-  #   select(one_of(vars.num)) %>%
-  #   melt(id = NULL, variable.name = 'Variables', value.name = 'Vals') %>%
-  #   group_by(Variables) %>%
-  #   summarise(Skewness = skewness(Vals)) %>%
-  #   mutate_if(is.factor, as.character)
-  # dfout <- dfout %>%
-  #   left_join(temp, by=c('Variables'))
-  # 
-  # 
-  # # vars.chr <- shape.1 %>%
-  # #   filter(Class=='character')%>%
-  # #   select(Variables) %>%
-  # #   pull()
-  # # 
-  # # temp <- df %>%
-  # #   select(one_of(vars.chr)) %>%
-  # #   melt(id = NULL, variable.name = 'Variables', value.name = 'Vals') %>%
-  # #   filter(!is.na(Vals)) %>%
-  # #   group_by(Variables) %>%
-  # #   arrange(Vals) %>%
-  # #   slice(c(1,n())) %>%
-  # #   mutate(Type=if_else(row_number()==1,'MIN','MAX')) 
-  # # 
-  # 
-  # # return result
+  
+  # 2.7 : get means for numerics
+  dfout$Mean <- df %>% sapply(custom_mean)
+  
+  # 2.8 : get skew for numerics
+  dfout$Skew <- df %>% sapply(custom_skew)
+  
   return(dfout)
 }
 
-
-# datashape(iris, FALSE)
-
+# get the alpha excel column designation 
 excelcol <- function(number) {
   
   # 1 : more variables than permitted columns in excel
@@ -211,5 +143,37 @@ excelcol <- function(number) {
   return('ERROR')
 }
 
-excelcol(677)
+# get means only for numeric columns
+custom_mean <- function(variable) {
+  
+  varclass <- paste(class(variable), collapse = '.')
+  vartype <- paste(typeof(variable), collapse = '.')
+  
+  if (varclass %in% c('numeric') & vartype %in% c('double')) {
+    return_val <- mean(variable, na.rm = TRUE)
+    return(sprintf("%.1f", return_val))
+  } else {
+    return('-')
+  }
+}
+
+# get skewness only for numeric columns
+custom_skew <- function(variable) {
+  
+  varclass <- paste(class(variable), collapse = '.')
+  vartype <- paste(typeof(variable), collapse = '.')
+  
+  if (varclass %in% c('numeric') & vartype %in% c('double')) {
+    
+    n <- length(variable)
+    mean_x1 <- mean(variable)
+    sd_x1 <- sqrt(sum((variable - mean_x1)^2) / (n))
+    z1 <- (variable - mean_x1) / sd_x1
+    skewness <- sum(z1^3) / n
+    
+    return(sprintf("%.1f", skewness))
+  } else {
+    return('-')
+  }
+}
 
