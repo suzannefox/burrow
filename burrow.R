@@ -199,32 +199,91 @@ xtab <- function(.data, side, header, options = c(), na_text = 'N/A') {
 # -------------------------------------------------------------------------
 
 # count the contents of variables in a dataframe
-hcount <- function(dataframe, elem_max = 20, elem_sort = TRUE) {
+hcount <- function(dataframe, elem_max = 20, elem_sort = TRUE, col_include = c(), col_exclude = c()) {
   
-  for (i in seq_along(dataframe %>% colnames())) {
+  # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  # determine columns to report on
+  
+  # if an include list is passed
+  count_include <- length(col_include)
+  
+  # if an exclude list is passed
+  count_exclude <- length(col_exclude)
+  
+  # get names
+  col_names <- dataframe %>% colnames()
+  count_names <- length(col_names)
+  
+  # an include takes precendence over an exclude
+  # get names to report, and check include or exclude list is valid
+  col_mode <- 'all'
+  if (count_include > 0) {
+    col_mode <- 'include'
+    col_report <- intersect(col_names, col_include)
+    count_report <- length(col_report)
+    
+    if (count_report != count_include) {
+      print(' ... WARNING : Include list variables not found in data')
+      
+      col_missing <- setdiff(col_include, col_names)
+      print(paste0(' ... Not Found : ', paste(col_missing, collapse = ',')))
+      col_mode <- 'include WARNING'
+    }
+  }
+  
+  if (count_exclude > 0) {
+    if (count_include > 0) {
+      print(' ... Include list takes precendence over exclude, ignoring')
+    } else {
+      col_mode <- 'exclude'
+      col_report <- setdiff(col_names, col_exclude)
+      count_report <- length(col_report)
+      
+      if (count_report != (count_names - count_exclude)) {
+        print(' ... WARNING : Include list variables not found in data')
+        
+        col_missing <- setdiff(col_exclude, col_report)
+        print(paste0(' ... Not Found : ', paste(col_missing, collapse = ',')))
+        col_mode <- 'exclude WARNING'
+      }
+    }
+  }
+  
+  if (count_report == 0) {
+    col_mode <- paste(col_mode, 'zero cols to report')
+    print('... ERROR, no valid cols to report on')
+    return()
+  }
+
+  print(paste0('... Reporting on ', paste(col_report, collapse = ',')))
+  
+  # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  # create the report
+  
+  for (i in 1:length(col_report)) {
     
     # get the list of columns on the first pass
-    if (i == 1) myvars <- dataframe %>% colnames()
+    if (i == 1) myvars <- col_report
     
     varname = myvars[i]
     
     # count occurances  
     df_count <- dataframe %>%
       count(!!sym(varname), sort = elem_sort) %>%
-      setNames(c('dataset', 'total')) %>%
+      setNames(c('data', 'total')) %>%
       mutate(source = varname, .before = 1) %>%
       mutate(info = 'element', .before = 2) %>%
       identity
     
     # get some information
     elem_count <- nrow(df_count)
-    elem_type <- typeof(df_count$dataset)
+    elem_type <- typeof(df_count$data)
     unique_text <- paste0(', uniques : ', elem_count)
     
     # truncate if there are too many elements
     if (nrow(df_count) > elem_max) {
       df_count <- df_count %>%
-        mutate(dataset = as.character(dataset)) %>%
+        mutate(data = as.character(data)) %>%
         slice(1:elem_max)
       
       unique_text <- paste0(unique_text, ', max printed : ', elem_max)
@@ -232,7 +291,7 @@ hcount <- function(dataframe, elem_max = 20, elem_sort = TRUE) {
     
     # make counts collapsable
     df_count <- df_count %>%
-      mutate(dataset = as.character(dataset))
+      mutate(data = as.character(data))
     
     # calculate %ages
     df_count <- df_count %>%
@@ -241,7 +300,7 @@ hcount <- function(dataframe, elem_max = 20, elem_sort = TRUE) {
     df_count <- bind_rows(
       data.frame(source = varname,
                  info = paste0('summary - datatype :',elem_type, unique_text),
-                 dataset = '',
+                 data = '',
                  total = elem_count,
                  pcent = ''),
       df_count)
@@ -254,6 +313,7 @@ hcount <- function(dataframe, elem_max = 20, elem_sort = TRUE) {
   }
   
   return(df_counts)
+  
 }
 
 # ---------------------------------------------
