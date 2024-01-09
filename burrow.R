@@ -196,6 +196,66 @@ xtab <- function(.data, side, header, options = c(), na_text = 'N/A') {
   return(col0)
 }
 
+# -------------------------------------------------------------------------
+
+# count the contents of variables in a dataframe
+hcount <- function(dataframe, elem_max = 20, elem_sort = TRUE) {
+  
+  for (i in seq_along(dataframe %>% colnames())) {
+    
+    # get the list of columns on the first pass
+    if (i == 1) myvars <- dataframe %>% colnames()
+    
+    varname = myvars[i]
+    
+    # count occurances  
+    df_count <- dataframe %>%
+      count(!!sym(varname), sort = elem_sort) %>%
+      setNames(c('dataset', 'total')) %>%
+      mutate(source = varname, .before = 1) %>%
+      mutate(info = 'element', .before = 2) %>%
+      identity
+    
+    # get some information
+    elem_count <- nrow(df_count)
+    elem_type <- typeof(df_count$dataset)
+    unique_text <- paste0(', uniques : ', elem_count)
+    
+    # truncate if there are too many elements
+    if (nrow(df_count) > elem_max) {
+      df_count <- df_count %>%
+        mutate(dataset = as.character(dataset)) %>%
+        slice(1:elem_max)
+      
+      unique_text <- paste0(unique_text, ', max printed : ', elem_max)
+    }
+    
+    # make counts collapsable
+    df_count <- df_count %>%
+      mutate(dataset = as.character(dataset))
+    
+    # calculate %ages
+    df_count <- df_count %>%
+      mutate(pcent = paste0(round(total / nrow(dataframe) * 100), ' %'))
+    
+    df_count <- bind_rows(
+      data.frame(source = varname,
+                 info = paste0('summary - datatype :',elem_type, unique_text),
+                 dataset = '',
+                 total = elem_count,
+                 pcent = ''),
+      df_count)
+    
+    if (i == 1) {
+      df_counts <- df_count
+    } else {
+      df_counts <- bind_rows(df_counts, df_count)
+    }
+  }
+  
+  return(df_counts)
+}
+
 # ---------------------------------------------
 # supporting functions
 
