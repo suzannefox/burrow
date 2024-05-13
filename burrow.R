@@ -2,30 +2,30 @@
 # ---------------------------------------------
 
 # information about a dataframe
-dfinfo <- function(df, diagnostics = FALSE, verbose = TRUE) {
+dfinfo <- function(df, diagnostics = FALSE, verbose = TRUE, catalog = FALSE) {
 
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   # 1.1 : get variable names
   dfout <- data.frame('Variables' = colnames(df), stringsAsFactors = FALSE) 
 
-  # 1.2 : check if variable names are well-formed
-  names.orig <- colnames(df)
-  names.good <- make.names(names.orig)
-  
-  # 1.3 : change if bad names
-  if (length(setdiff(names.good, names.orig)) > 0) {
-    # give the df good names
-    if (verbose) print(' ... WARNING : changing to well formed variable names')
-    
-    dfout <- dfout %>% 
-      mutate(GoodNames = names.good) %>% 
-      mutate(Changed = if_else(Variables==Variables.Orig,"","CHANGED"))
-    
-    colnames(df) <- names.good
-  }
+  # 1.2 : get variable order
+  dfout$Order <- sapply(1:ncol(df), function(x) {x})
   
   # 1.3 : get excel column header
   dfout$Excel <- sapply(1:ncol(df), excelcol) 
+  
+  # 1.4 : Add catalog
+  if (!missing(catalog)) {
+    # check there's a Variables column
+    cols_catalog <- catalog %>% colnames()
+    if (!'Variables' %in% cols_catalog) {
+      print(" ... WARNING : catalog dataframe missing a 'Vaariables' column, ignoring")
+    } else {
+      dfout <- dfout %>% 
+        left_join(catalog, by='Variables') %>% 
+        mutate_if(is.character, ~replace_na(., ''))
+    }
+  }
   
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   # 2.1 : get variable class
