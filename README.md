@@ -10,7 +10,7 @@ Useful for -
 
 # Example
 
-output from Palmer Penguins dataset, with user supplied variable description
+output from Palmer Penguins dataset, with user supplied catalog of variable description
 
 ![image](https://github.com/suzannefox/burrow/assets/8460128/0775e201-55fb-4f89-9f7e-940489cc008f)
 
