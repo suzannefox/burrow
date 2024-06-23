@@ -6,7 +6,7 @@ any user supplied information such as description or notes
 
 Useful for -
 - understanding the structure of a dataframe
-- save metadata output to a CSV and compare with previously supplied datasets to identify structural differences (*supplied in compare_metadata_dataframes.ipynb*)
+- save metadata output to a CSV and compare with previously supplied datasets to identify structural differences (*see example in compare_metadata_dataframes.ipynb*)
  
 # Example
 
