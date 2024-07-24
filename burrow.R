@@ -1,5 +1,7 @@
 
-# information about a dataframe
+# Burrow : Schema information about a dataframe --------------------------------
+# 2024-07-24 : add custom_max, custom_min to catch variables containing 100% na values
+# 2024-07-24 : add a timer to say how long the function took
 dfinfo <- function(df, diagnostics = FALSE, verbose = TRUE, catalog = FALSE) {
   
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -9,7 +11,7 @@ dfinfo <- function(df, diagnostics = FALSE, verbose = TRUE, catalog = FALSE) {
   library(tidyverse)
   
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  # df <- .data
+  t_start <- Sys.time()
   if (nrow(df) == 0 | ncol(df) == 0) {
     print(glue::glue(' ... dataframe is empty'))
     return()
@@ -115,6 +117,27 @@ dfinfo <- function(df, diagnostics = FALSE, verbose = TRUE, catalog = FALSE) {
     }
   }
   
+  # min that checks for all nas first so it doesn't throw a Inf warning
+  custom_min <- function(variable) {
+    # Check if all values are NA
+    if (all(is.na(variable))) {
+      return('-')
+    } else {
+      return(as.character(min(variable, na.rm = TRUE)))
+    }
+  }
+  
+  # min that checks for all nas first so it doesn't throw a Inf warning
+  custom_max <- function(variable) {
+    # Check if all values are NA
+    if (all(is.na(variable))) {
+      return('-')
+    } else {
+      return(as.character(max(variable, na.rm = TRUE)))
+    }
+  }
+  
+  
   # get skewness only for numeric columns
   custom_skew <- function(variable) {
     
@@ -184,10 +207,10 @@ dfinfo <- function(df, diagnostics = FALSE, verbose = TRUE, catalog = FALSE) {
   dfout$Unique_PC <- sprintf("%.0f%%", as.numeric(dfout$Unique_Tot) / nrow(df) * 100)
   
   # 2.5 : get min values
-  dfout$Min <- df %>% sapply(function(x) as.character(min(x, na.rm = TRUE)))
+  dfout$Min <- df %>% sapply(custom_min)
   
   # 2.6 : get max values
-  dfout$Max <- df %>% sapply(function(x) as.character(max(x, na.rm = TRUE)))
+  dfout$Max <- df %>% sapply(custom_max)
   
   # 2.7 : get means for numerics
   dfout$Mean <- df %>% sapply(custom_mean)
@@ -195,14 +218,21 @@ dfinfo <- function(df, diagnostics = FALSE, verbose = TRUE, catalog = FALSE) {
   # 2.8 : get skew for numerics
   dfout$Skew <- df %>% sapply(custom_skew)
   
+  t_finish = Sys.time()
+  t_taken <- as.numeric(t_finish - t_start, units = 'secs')
+  print(paste0('Done, time taken (seconds) = ', round(t_taken, 1)))
+  
   return(dfout)
 }
 
-# -------------------------------------------------------------------------
-
-# Crosstabs : generate a crosstab
-xtab <- function(.data, side, header, options = c(), na_text = 'N/A', 
-                 sidecats = 0, headcats = 0, verbose = FALSE) {
+# Crosstabs : generate a crosstab ----------------------------------------------
+xtab <- function(.data, 
+                 side, sidecats = 0, 
+                 header, headcats = 0,
+                 na_text = 'N/A', 
+                 return_data = FALSE,
+                 verbose = FALSE, 
+                 options = c()) {
   
   df <- .data
   
@@ -353,15 +383,19 @@ xtab <- function(.data, side, header, options = c(), na_text = 'N/A',
   # set any nas to zero
   col0 <- col0 %>% 
     rename(!!side_txt := sidevar) %>% 
-    mutate(across(where(is.numeric), coalesce, 0)) %>% 
+    # mutate(across(where(is.numeric), coalesce, 0)) %>% 
+    mutate(across(where(is.numeric), ~ ifelse(is.na(.), 0, .))) %>% 
     identity()
-  
-  return(col0)
+
+  if (return_data == FALSE) {  
+    return(col0)
+  } else {
+    return(list(col0, df_tab))
+  }
 }
 
-# -------------------------------------------------------------------------
 
-# count the contents of variables in a dataframe
+# Holecount : count the contents of variables in a dataframe -------------------
 hcount <- function(.data, elem_max = 20, elem_sort = TRUE, cols_include = c(), cols_exclude = c()) {
   
   df <- .data
